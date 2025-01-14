@@ -1,0 +1,7 @@
+{
+	"[plaintext]": {
+		"editor.rulers": [40, 80],
+		"editor.wordWrap": "wordWrapColumn",
+		"editor.wordWrapColumn": 80
+	}
+}

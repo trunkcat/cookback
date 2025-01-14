@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"forceConsistentCasingInFileNames": true,
+		"newLine": "lf",
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitReturns": true,
+		"noUnusedParameters": true,
+		"rootDir": "./src/",
+		"strict": true,
+		"moduleResolution": "node",
+		"module": "ESNext",
+		"outDir": "./out/",
+		"skipLibCheck": true,
+		"target": "ESNext"
+	},
+	"include": ["src/"]
+}
