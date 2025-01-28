@@ -1,8 +1,6 @@
 import { relations } from "drizzle-orm";
 import { integer, pgTable, text, serial } from "drizzle-orm/pg-core";
 
-export const COIN_LIMIT = 20000000;
-
 export const managers = pgTable("managers", {
 	managerId: serial().primaryKey(),
 	managerName: text().unique().notNull(),
