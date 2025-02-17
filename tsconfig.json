@@ -3,15 +3,16 @@
 		"forceConsistentCasingInFileNames": true,
 		"newLine": "lf",
 		"noFallthroughCasesInSwitch": true,
-		"noImplicitReturns": true,
-		"noUnusedParameters": true,
+		// "noImplicitReturns": true,
+		// "noUnusedParameters": true,
 		"rootDir": "./src/",
 		"strict": true,
-		"moduleResolution": "node",
-		"module": "ESNext",
+		"moduleResolution": "nodenext",
+		"module": "NodeNext",
 		"outDir": "./out/",
 		"skipLibCheck": true,
-		"target": "ESNext"
+		"target": "ESNext",
+		"allowSyntheticDefaultImports": true
 	},
 	"include": ["src/"]
 }
