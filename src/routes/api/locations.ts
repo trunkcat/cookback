@@ -1,7 +1,7 @@
 import { Router } from "@oak/oak";
 import { z } from "zod";
-import { db, schema } from "../../database.js";
-import { verify } from "../../jwt.js";
+import { db, schema } from "../../database/index.js";
+import { parseBody } from "../../utils.js";
 
 const router = new Router({ prefix: "/locations" });
 
@@ -18,61 +18,24 @@ const postSchema = z.object({
 });
 
 router.post("/", async (ctx) => {
-	if (!ctx.request.body.has) {
+	const parsed = await parseBody(ctx, postSchema);
+	if (!parsed.ok) {
 		ctx.response.status = 400;
-		ctx.response.body = { ok: false, reason: "Expected body" };
-		return;
-	}
-	if (ctx.request.headers.get("content-type") !== "application/json") {
-		ctx.response.status = 400;
-		ctx.response.body = {
-			ok: false,
-			reason: "Expected content type to be JSON",
-		};
-		return;
-	}
-
-	let data: z.infer<typeof postSchema>;
-	try {
-		const body = await ctx.request.body.json();
-		data = postSchema.parse(body);
-	} catch (error) {
-		ctx.response.status = 400;
-		ctx.response.body = { ok: false, reason: "Invalid body" };
+		ctx.response.body = { ok: false, message: parsed.message };
 		return;
 	}
 
 	const inserted = await db
 		.insert(schema.locations)
 		.values({
-			name: data.name,
-			unlocksAt: data.unlocks_at,
-			coinsNeeded: data.coins_needed,
+			name: parsed.data.name,
+			unlocksAt: parsed.data.unlocks_at,
+			coinsNeeded: parsed.data.coins_needed,
 		})
 		.returning();
 
 	ctx.response.status = 200;
 	ctx.response.body = { ok: true, data: inserted };
-});
-
-router.use(async (ctx, next) => {
-	const authToken = ctx.request.headers.get("Authorization");
-	if (!authToken) {
-		ctx.response.status = 401;
-		ctx.response.body = { ok: false, reason: "Unauthorized" };
-		return;
-	}
-
-	try {
-		await verify(authToken);
-	} catch (error) {
-		console.error(error);
-		ctx.response.status = 401;
-		ctx.response.body = { ok: false, reason: "Unauthorized" };
-		return;
-	}
-
-	await next();
 });
 
 export const locationsRouter = router;

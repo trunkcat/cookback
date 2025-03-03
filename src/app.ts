@@ -17,13 +17,17 @@ app.use(async (ctx, next) => {
 
 app.use(async (ctx, next) => {
 	try {
+		console.log(ctx.request.url.pathname);
 		await next();
 	} catch (error) {
-		ctx.response.status = 500;
 		console.error(error);
+
+		ctx.response.status = 500;
+		ctx.response.headers.set("Content-Type", "application/json");
+		ctx.response.body = { ok: false, message: "Internal Server Error" };
 	}
 });
 
 app.use(router.routes());
 app.use(router.allowedMethods());
-app.listen({ port: 8080 });
+app.listen({ port: 8080, hostname: "192.168.29.36" });

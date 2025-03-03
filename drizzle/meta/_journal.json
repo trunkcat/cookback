@@ -15,6 +15,13 @@
       "when": 1736864321864,
       "tag": "0001_smooth_blockbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1740972192367,
+      "tag": "0002_worried_mandarin",
+      "breakpoints": true
     }
   ]
 }
