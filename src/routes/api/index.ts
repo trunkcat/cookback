@@ -24,6 +24,12 @@ apiRouter.use(async (ctx, next) => {
 	await next();
 });
 
+apiRouter.get("/healthcheck", async (ctx) => {
+	ctx.response.status = 200;
+	ctx.response.body = { ok: true };
+	return;
+});
+
 const postSchema = z.object({
 	username: z.string().nonempty(),
 	password: z.string().nonempty(),
@@ -127,6 +133,7 @@ apiRouter.use(async (ctx, next) => {
 
 	await next();
 });
+
 apiRouter.get("/player", async (ctx) => {
 	const [player] = await db
 		.select({

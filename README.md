@@ -1,29 +1,65 @@
-=== COOOK ======================================================================
+# Cookback
 
-A work-in-progress cooking game project.
+Cook game's backend server.
 
-== DESCRIPTION =================================================================
+## Setup
+
+- Make sure you have Node.js 22 installed.
+- Use pnpm instead of npm or yarn.
+
+Clone the repository and install dependencies:
+
+```sh
+git clone https://github.com/trunkcat/cookback
+cd cookback
+pnpm install
+```
+
+If you are developing, make sure you run `tsc` to compile the code.
+Install `tsc` as a global binary using `pnpm install -g typescript`.
+Run `tsc --watch` in the directory afterwards.
+
+Before starting the application, set up some environmental variables in `.env` file. (TODO: Drizzle setup scripts)
+
+```sh
+DATABASE_URL="" # Required. Connection string for the PostgreSQL database.
+JWT_SECRET_SIGNATURE="" # Required. Secret sign key for JWT, keep it safe.
+HOSTNAME="" # Optional. Hostname for the server. Defaults to oak's.
+PORT=8080 # Optional. Port for the server. Defaults to 8080
+```
+
+Now to start the application, run:
+
+```sh
+pnpm run dev
+```
+
+Only the `dev` script is configured as of now.
+Running this should print the HTTP URL the server is serving on.
+Checkout the `/api/healthcheck` route to see if it returns `true`.
+
+## Description
 
 (To be added later)
 
-== TODOS & ROADMAP (v0) ========================================================
+## TODOs & Roadmap (v0)
 
 Detailed descriptions will be added later.
 
-- Setup the HTTP server
-- Finish database schema
-- Decide what to store and where
-- Registration & Authentication
-- Websocket connection
+- [x] Setup the base HTTP server
+- [ ] Finish database schema
+    - [ ] Decide what to store and where
+- [x] Basic Registration & Authentication
+- [ ] Websocket connection
 
-=== DEVELOPER NOTES ============================================================
+## Developer Notes
 
 If this ends up as a game with online multiplayer as planned, then, the game
 needs to be a fully online game, including saves and progress. Another option is
 to make the game offline and with offline LAN support. But that would destroy
 the online thing we need for the DBMS project.
 
-=== LICENSE ====================================================================
+## License
 
 MIT License
 

@@ -30,4 +30,10 @@ app.use(async (ctx, next) => {
 
 app.use(router.routes());
 app.use(router.allowedMethods());
-app.listen({ port: 8080, hostname: "192.168.29.36" });
+
+const hostname = process.env.HOSTNAME;
+const port = Number(process.env.PORT ?? 8080);
+if (isNaN(port)) throw new Error("Invalid PORT specified");
+
+console.log("Starting app at", `http://${hostname ?? "localhost"}:${port}`);
+app.listen({ port, hostname: process.env.HOSTNAME });
