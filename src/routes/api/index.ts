@@ -3,7 +3,7 @@ import { locationsRouter } from "./locations.js";
 import { parseBody } from "../../utils.js";
 import { z } from "zod";
 import { db, schema } from "../../database/index.js";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
 	createPasswordHash,
 	createSession,
@@ -95,6 +95,7 @@ apiRouter.post("/sign-in", async (ctx) => {
 	ctx.response.body = { ok: true, data: { sessionToken } };
 });
 
+// TODO: move this downwards and organize neatly
 apiRouter.use(locationsRouter.routes());
 apiRouter.use(locationsRouter.allowedMethods());
 
@@ -102,7 +103,7 @@ apiRouter.use(async (ctx, next) => {
 	const authToken = ctx.request.headers.get("Authorization")?.trim();
 	if (!authToken) {
 		ctx.response.status = 401;
-		ctx.response.body = { ok: false, message: "Unauthorized" };
+		ctx.response.body = { ok: false, message: "Authorization required" };
 		return;
 	}
 	const BEARER_PREFIX = "Bearer ";
@@ -134,6 +135,27 @@ apiRouter.use(async (ctx, next) => {
 	await next();
 });
 
+apiRouter.delete("/sign-out", async (ctx) => {
+	const [session] = await db
+		.delete(schema.playerSessions)
+		.where(
+			and(
+				eq(schema.playerSessions.id, ctx.state.sessionId),
+				eq(schema.playerSessions.playerId, ctx.state.playerId),
+			),
+		)
+		.returning({ id: schema.playerSessions.id });
+
+	if (session == null) {
+		ctx.response.status = 404;
+		ctx.response.body = { ok: false, message: "Session not found" };
+		return;
+	}
+
+	ctx.response.status = 200;
+	ctx.response.body = { ok: true, data: true };
+});
+
 apiRouter.get("/player", async (ctx) => {
 	const [player] = await db
 		.select({
@@ -159,5 +181,5 @@ apiRouter.get("/player", async (ctx) => {
 	}
 
 	ctx.response.status = 200;
-	ctx.response.body = { ok: true, message: player.username, data: player };
+	ctx.response.body = { ok: true, data: player };
 });

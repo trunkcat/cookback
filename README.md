@@ -38,6 +38,8 @@ Only the `dev` script is configured as of now.
 Running this should print the HTTP URL the server is serving on.
 Checkout the `/api/healthcheck` route to see if it returns `true`.
 
+In order for the server to work when hosted on your local network, consider enabling the firewall access for the port 8080.
+
 ## Description
 
 (To be added later)
