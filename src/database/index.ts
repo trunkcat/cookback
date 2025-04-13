@@ -2,10 +2,10 @@ import { neon } from "@neondatabase/serverless";
 import { and, eq, not } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { hashPassword, verifyPassword } from "../auth.js";
+import { env } from "../env.js";
 import * as schema from "./schema.js";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is not set");
+const connectionString = env.DATABASE_URL;
 
 const sql = neon(connectionString!);
 
@@ -17,14 +17,8 @@ export const db = drizzle({
 
 export { schema };
 
-export const SUPERMANAGER_USERNAME = process.env.SUPERMANAGER_USERNAME;
-if (SUPERMANAGER_USERNAME == null) {
-	throw new Error("SUPERMANAGER_USERNAME not set.");
-}
-export const SUPERMANAGER_PASSWORD = process.env.SUPERMANAGER_PASSWORD;
-if (SUPERMANAGER_PASSWORD == null) {
-	throw new Error("SUPERMANAGER_PASSWORD not set.");
-}
+export const SUPERMANAGER_USERNAME = env.SUPERMANAGER_USERNAME;
+export const SUPERMANAGER_PASSWORD = env.SUPERMANAGER_PASSWORD;
 
 // Setup the supermanager account:
 (async () => {

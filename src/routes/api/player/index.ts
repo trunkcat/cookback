@@ -12,7 +12,7 @@ import {
 	SESSION_RENEWAL_PERIOD,
 } from "../../../constants.js";
 import { db, schema } from "../../../database/index.js";
-import { parseBody } from "../../../utils.js";
+import { parseBody } from "../../../utilities.js";
 
 interface State {
 	playerId: string;

@@ -13,7 +13,7 @@ import {
 } from "../../../constants.js";
 import { db, schema, SUPERMANAGER_USERNAME } from "../../../database/index.js";
 import { Manager, ManagerSession } from "../../../database/schema-types.js";
-import { parseBody } from "../../../utils.js";
+import { parseBody } from "../../../utilities.js";
 import placesRouter from "./places.js";
 
 interface State {
@@ -122,8 +122,6 @@ router.post("/login", async (ctx) => {
 		manager.managerId,
 	);
 
-	await ctx.cookies.set(SESSION_COOKIE_NAME, sessionToken);
-
 	ctx.response.status = 200;
 	ctx.response.body = {
 		ok: true,
@@ -135,26 +133,17 @@ router.post("/login", async (ctx) => {
 });
 
 router.use(async (ctx, next) => {
-	const authToken = ctx.request.headers.get("Authorization")?.trim();
-	if (!authToken) {
+	const sessionToken = await ctx.cookies.get(SESSION_COOKIE_NAME);
+	console.log("Verifying session token: " + sessionToken);
+
+	if (!sessionToken) {
 		ctx.response.status = 401;
 		ctx.response.body = { ok: false, message: "Authorization required" };
 		return;
 	}
-	const BEARER_PREFIX = "Bearer ";
-	if (
-		authToken.length <= BEARER_PREFIX.length + 1 ||
-		!authToken.startsWith(BEARER_PREFIX)
-	) {
-		ctx.response.status = 401;
-		ctx.response.body = { ok: false, message: "Invalid authorization header" };
-		return;
-	}
 
-	const sessionToken = authToken.slice(BEARER_PREFIX.length);
 	const result = await validateManagerSessionToken(sessionToken);
 	if (result == null) {
-		await ctx.cookies.delete(SESSION_COOKIE_NAME);
 		ctx.response.status = 401;
 		ctx.response.body = { ok: false, message: "Unauthorized" };
 		return;

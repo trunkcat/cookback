@@ -2,7 +2,7 @@ import { Router } from "@oak/oak";
 import { z } from "zod";
 import { db, schema } from "../../../database/index.js";
 import { PLACE_TYPE } from "../../../database/schema-types.js";
-import { parseBody } from "../../../utils.js";
+import { parseBody } from "../../../utilities.js";
 
 const router = new Router({ prefix: "/places" });
 

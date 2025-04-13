@@ -1,25 +1,16 @@
 import { Application } from "@oak/oak";
-import { config } from "dotenv";
 import { networkInterfaces } from "node:os";
+import { env } from "./env.js";
 import { router } from "./routes/index.js";
-
-config({ path: ".env" });
+import { cors } from "./utilities.js";
 
 const app = new Application();
 
-app.use(async (ctx, next) => {
-	ctx.response.headers.set("Access-Control-Allow-Origin", "*");
-	ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
-	ctx.response.headers.set(
-		"Access-Control-Allow-Headers",
-		"Content-Type,Authorization",
-	);
-	await next();
-});
+app.use(cors);
 
 app.use(async (ctx, next) => {
 	try {
-		console.log(ctx.request.method, ctx.request.url.pathname);
+		console.log("\n" + ctx.request.method, ctx.request.url.pathname);
 		await next();
 	} catch (error) {
 		console.error(error);
@@ -33,10 +24,10 @@ app.use(async (ctx, next) => {
 app.use(router.routes());
 app.use(router.allowedMethods());
 
-const port = Number(process.env.PORT ?? 0);
-if (isNaN(port)) throw new Error("Invalid PORT specified");
+const port = env.PORT;
+if (port <= 0) throw new Error("Port must be a natural number");
 
-const hostname = process.env.HOSTNAME;
+const hostname = env.HOSTNAME;
 
 if (hostname == null || hostname.length == 0 || hostname === "0.0.0.0") {
 	const interfaces = networkInterfaces();

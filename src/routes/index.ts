@@ -1,5 +1,5 @@
 import { Router } from "@oak/oak";
-import { apiRouter } from "./api/index.js";
+import apiRouter from "./api/index.js";
 
 export const router = new Router();
 

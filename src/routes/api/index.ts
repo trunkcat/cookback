@@ -3,27 +3,30 @@ import dataRouter from "./data/index.js";
 import managerRouter from "./manager/index.js";
 import playerRouter from "./player/index.js";
 
-export const apiRouter = new Router({ prefix: "/api" });
+const router = new Router({ prefix: "/api" });
 
-apiRouter.use(async (ctx, next) => {
+router.use(async (ctx, next) => {
 	ctx.response.headers.set("Content-Type", "application/json");
-	for await (const cookie of ctx.cookies.entries()) {
-		console.log(cookie[0], cookie[1]);
-	}
+	// console.log("Cookies: " + await ctx.cookies.size);
+	// for await (const cookie of ctx.cookies.entries()) {
+	// 	console.log("\t-", cookie[0] + ":", cookie[1]);
+	// }
 	await next();
 });
 
-apiRouter.get("/healthcheck", async (ctx) => {
+router.get("/healthcheck", async (ctx) => {
 	ctx.response.status = 200;
 	ctx.response.body = { ok: true };
 	return;
 });
 
-apiRouter.use(dataRouter.routes());
-apiRouter.use(dataRouter.allowedMethods());
+export default router;
 
-apiRouter.use(managerRouter.routes());
-apiRouter.use(managerRouter.allowedMethods());
+router.use(dataRouter.routes());
+router.use(dataRouter.allowedMethods());
 
-apiRouter.use(playerRouter.routes());
-apiRouter.use(playerRouter.allowedMethods());
+router.use(managerRouter.routes());
+router.use(managerRouter.allowedMethods());
+
+router.use(playerRouter.routes());
+router.use(playerRouter.allowedMethods());
