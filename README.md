@@ -50,7 +50,7 @@ Detailed descriptions will be added later.
 
 - [x] Setup the base HTTP server
 - [ ] Finish database schema
-    - [ ] Decide what to store and where
+  - [ ] Decide what to store and where
 - [x] Basic Registration & Authentication
 - [ ] Websocket connection
 

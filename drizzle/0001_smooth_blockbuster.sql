@@ -1,1 +1,0 @@
-ALTER TABLE "player_stats" ADD COLUMN "experience_points" integer NOT NULL;

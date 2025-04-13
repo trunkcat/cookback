@@ -1,12 +1,29 @@
-import { encodeBase64url, encodeHexLowerCase } from "@oslojs/encoding";
-import { Argon2id } from "oslo/password";
-import { db, schema } from "./database/index.js";
+import { hash, Options, verify, Version } from "@node-rs/argon2";
 import { sha256 } from "@oslojs/crypto/sha2";
-import {
-	SESSION_EXPIRATION_PERIOD,
-	SESSION_RENEW_PERIOD,
-} from "./constants.js";
-import { eq } from "drizzle-orm";
+import { encodeBase64url, encodeHexLowerCase } from "@oslojs/encoding";
+
+// Took the following as reference, as they also migrated away from oslo/password to @node-rs/argon2.
+// https://github.com/wasp-lang/wasp/blob/90651b082677e784eca6380e27bf912092942d1e/waspc/data/Generator/templates/sdk/wasp/auth/password.ts
+// They followed the same configuration as oslo/password: https://github.com/pilcrowonpaper/oslo/blob/04d6c0522e24265106c10d82c3b490e97bac9ab0/src/password/argon2id.ts
+const hashingOptions: Options = {
+	memoryCost: 19456,
+	timeCost: 2,
+	outputLen: 32,
+	parallelism: 1,
+	version: Version.V0x13,
+};
+
+function normalizePassword(password: string): string {
+	return password.normalize("NFKC");
+}
+
+export function hashPassword(password: string) {
+	return hash(normalizePassword(password), hashingOptions);
+}
+
+export function verifyPassword(hash: string, password: string) {
+	return verify(hash, normalizePassword(password), hashingOptions);
+}
 
 export function generateSessionToken(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(18));
@@ -14,79 +31,6 @@ export function generateSessionToken(): string {
 	return token;
 }
 
-const argon2 = new Argon2id();
-
-export function createPasswordHash(password: string) {
-	return argon2.hash(password);
-}
-
-export function verifyPassword(hash: string, password: string) {
-	return argon2.verify(hash, password);
-}
-
-export async function createSession(
-	token: string,
-	playerId: number,
-): Promise<Omit<schema.PlayerSession, "createdAt" | "expiresAt">> {
-	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-	const now = new Date();
-	const session: schema.PlayerSession = {
-		id: sessionId,
-		playerId: playerId,
-		expiresAt: new Date(now.getTime() + SESSION_EXPIRATION_PERIOD),
-		createdAt: now,
-	};
-	await db.insert(schema.playerSessions).values(session);
-	return {
-		id: sessionId,
-		playerId: playerId,
-	};
-}
-
-export async function invalidateSession(sessionId: string) {
-	await db
-		.delete(schema.playerSessions)
-		.where(eq(schema.playerSessions.id, sessionId));
-}
-
-export async function validateSessionToken(
-	token: string,
-): Promise<{ sessionId: string; playerId: number } | null> {
-	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-	const [result] = await db
-		.select({
-			sessionId: schema.playerSessions.id,
-			expiresAt: schema.playerSessions.expiresAt,
-			playerId: schema.players.playerId,
-		})
-		.from(schema.playerSessions)
-		.innerJoin(
-			schema.players,
-			eq(schema.playerSessions.playerId, schema.players.playerId),
-		)
-		.where(eq(schema.playerSessions.id, sessionId));
-
-	if (result == null) {
-		return null;
-	}
-
-	const now = new Date();
-	const sessionExpired = now.getTime() >= result.expiresAt.getTime();
-	if (sessionExpired) {
-		await invalidateSession(result.sessionId);
-		return null;
-	}
-
-	const renewSession =
-		now.getTime() >= result.expiresAt.getTime() - SESSION_RENEW_PERIOD;
-
-	if (renewSession) {
-		result.expiresAt = new Date(now.getTime() + SESSION_EXPIRATION_PERIOD);
-		await db
-			.update(schema.playerSessions)
-			.set({ expiresAt: result.expiresAt })
-			.where(eq(schema.playerSessions.id, result.sessionId));
-	}
-
-	return { sessionId: result.sessionId, playerId: result.playerId };
+export function calculateSessionIdFromToken(token: string) {
+	return encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
 }

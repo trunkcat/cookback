@@ -8,7 +8,7 @@ type ParseResult<T> =
 export async function parseBody<T extends ZodSchema | undefined = undefined>(
 	ctx: Context,
 	schema?: T,
-): Promise<ParseResult<T extends ZodSchema ? z.infer<T> : any>> {
+): Promise<ParseResult<T extends ZodSchema ? z.infer<T> : unknown>> {
 	if (!ctx.request.body.has) {
 		return { ok: false, message: "Expected body" };
 	}
@@ -22,8 +22,9 @@ export async function parseBody<T extends ZodSchema | undefined = undefined>(
 		return { ok: true, data: result };
 	} catch (error) {
 		if (error instanceof ZodError) {
-			const message =
-				error.issues.length == 0 ? "Invalid inputs" : error.issues[0].message;
+			const message = error.issues.length == 0 ?
+				"Invalid inputs" :
+				error.issues[0].message;
 			return { ok: false, message: message };
 		}
 		return { ok: false, message: "Invalid body" };
