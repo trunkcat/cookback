@@ -12,7 +12,11 @@ import {
 	SESSION_RENEWAL_PERIOD,
 } from "../../../constants.js";
 import { db, schema, SUPERMANAGER_USERNAME } from "../../../database/index.js";
-import { Manager, ManagerSession } from "../../../database/schema-types.js";
+import {
+	Manager,
+	ManagerRole,
+	ManagerSession,
+} from "../../../database/schema-types.js";
 import { parseBody } from "../../../utilities.js";
 import placesRouter from "./places.js";
 
@@ -23,6 +27,92 @@ interface State {
 }
 
 const router = new Router<State>({ prefix: "/manager" });
+
+const loginSchema = z.object({
+	username: z.string().nonempty(),
+	password: z.string().nonempty(),
+});
+
+const SESSION_COOKIE_NAME = "auth-session";
+
+router.post("/login", async (ctx) => {
+	const parsed = await parseBody(ctx, loginSchema);
+	if (!parsed.ok) {
+		ctx.response.status = 400;
+		ctx.response.body = { ok: false, message: "Invalid credentials" };
+		return;
+	}
+
+	const role: ManagerRole = parsed.data.username === SUPERMANAGER_USERNAME ?
+		"supermanager" :
+		"manager";
+
+	const [manager] = await db
+		.select({
+			managerId: schema.manager.managerId,
+			passwordHash: schema.manager.passwordHash,
+		})
+		.from(schema.manager)
+		.where(
+			and(
+				eq(schema.manager.username, parsed.data.username),
+				eq(schema.manager.role, role),
+			),
+		);
+
+	if (manager == null) {
+		ctx.response.status = 404;
+		ctx.response.body = { ok: false, message: "Manager not found" };
+		return;
+	}
+
+	const isCorrect = await verifyPassword(
+		manager.passwordHash,
+		parsed.data.password,
+	);
+	if (!isCorrect) {
+		ctx.response.status = 400;
+		ctx.response.body = { ok: false, message: "Invalid credentials" };
+		return;
+	}
+
+	const sessionToken = generateSessionToken();
+	const { expiresAt } = await createManagerSession(
+		sessionToken,
+		manager.managerId,
+	);
+
+	ctx.response.status = 200;
+	ctx.response.body = {
+		ok: true,
+		data: {
+			sessionToken,
+			expiresAt: expiresAt.toISOString(),
+			role: role,
+		},
+	};
+});
+
+router.use(async (ctx, next) => {
+	const sessionToken = await ctx.cookies.get(SESSION_COOKIE_NAME);
+	console.log("Verifying session token: " + sessionToken);
+
+	if (!sessionToken) {
+		ctx.response.status = 401;
+		ctx.response.body = { ok: false, message: "Authorization required" };
+		return;
+	}
+
+	const result = await validateManagerSessionToken(sessionToken);
+	if (result == null) {
+		ctx.response.status = 401;
+		ctx.response.body = { ok: false, message: "Unauthorized" };
+		return;
+	}
+
+	ctx.state = { session: result };
+	await next();
+});
 
 const registerSchema = z.object({
 	username: z.string().nonempty(),
@@ -57,7 +147,7 @@ router.post("/register", async (ctx) => {
 		.insert(schema.manager)
 		.values({
 			username: parsed.data.username,
-			email: parsed.data.username,
+			email: parsed.data.email,
 			passwordHash: hashedPassword,
 			role: "manager",
 		})
@@ -65,92 +155,6 @@ router.post("/register", async (ctx) => {
 
 	ctx.response.status = 200;
 	ctx.response.body = { ok: true };
-});
-
-const loginSchema = z.object({
-	username: z.string().nonempty(),
-	password: z.string().nonempty(),
-});
-
-const SESSION_COOKIE_NAME = "auth-session";
-
-router.post("/login", async (ctx) => {
-	const parsed = await parseBody(ctx, loginSchema);
-	if (!parsed.ok) {
-		ctx.response.status = 400;
-		ctx.response.body = { ok: false, message: "Invalid credentials" };
-		return;
-	}
-
-	const [manager] = await db
-		.select({
-			managerId: schema.manager.managerId,
-			passwordHash: schema.manager.passwordHash,
-		})
-		.from(schema.manager)
-		.where(
-			and(
-				eq(schema.manager.username, parsed.data.username),
-				eq(
-					schema.manager.role,
-					parsed.data.username === SUPERMANAGER_USERNAME ?
-						"supermanager" :
-						"manager",
-				),
-			),
-		);
-
-	if (manager == null) {
-		ctx.response.status = 404;
-		ctx.response.body = { ok: false, message: "Manager not found" };
-		return;
-	}
-
-	const isCorrect = await verifyPassword(
-		manager.passwordHash,
-		parsed.data.password,
-	);
-	if (!isCorrect) {
-		ctx.response.status = 400;
-		ctx.response.body = { ok: false, message: "Invalid credentials" };
-		return;
-	}
-
-	const sessionToken = generateSessionToken();
-	const { expiresAt } = await createManagerSession(
-		sessionToken,
-		manager.managerId,
-	);
-
-	ctx.response.status = 200;
-	ctx.response.body = {
-		ok: true,
-		data: {
-			sessionToken,
-			expiresAt: expiresAt.toISOString(),
-		},
-	};
-});
-
-router.use(async (ctx, next) => {
-	const sessionToken = await ctx.cookies.get(SESSION_COOKIE_NAME);
-	console.log("Verifying session token: " + sessionToken);
-
-	if (!sessionToken) {
-		ctx.response.status = 401;
-		ctx.response.body = { ok: false, message: "Authorization required" };
-		return;
-	}
-
-	const result = await validateManagerSessionToken(sessionToken);
-	if (result == null) {
-		ctx.response.status = 401;
-		ctx.response.body = { ok: false, message: "Unauthorized" };
-		return;
-	}
-
-	ctx.state = { session: result };
-	await next();
 });
 
 router.get("/session", async (ctx) => {
@@ -185,23 +189,18 @@ router.delete("/logout", async (ctx) => {
 });
 
 router.get("/", async (ctx) => {
-	const manager = await db.query.manager.findFirst({
-		where: eq(schema.manager.managerId, ctx.state.session.managerId),
-		columns: {
-			username: true,
-			email: true,
-			managerId: true,
-		},
+	ctx.response.status = 200;
+	ctx.response.body = { ok: true, data: ctx.state.session.manager };
+});
+
+router.get("/all-managers", async (ctx) => {
+	const managers = await db.query.manager.findMany({
+		where: eq(schema.manager.role, "manager"),
+		columns: { passwordHash: false },
 	});
 
-	if (manager == null) {
-		ctx.response.status = 404;
-		ctx.response.body = { ok: false, message: "Manager not found" };
-		return;
-	}
-
 	ctx.response.status = 200;
-	ctx.response.body = { ok: true, data: manager };
+	ctx.response.body = managers;
 });
 
 export default router;
