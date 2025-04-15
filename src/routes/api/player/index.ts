@@ -54,17 +54,33 @@ router.post("/register", async (ctx) => {
 		.insert(schema.player)
 		.values({
 			username: parsed.data.username,
-			email: parsed.data.username,
+			email: parsed.data.email,
 			passwordHash: hashedPassword,
 		})
 		.returning({ playerId: schema.player.playerId });
+
+	const PLAYER_LEVEL = 1;
 
 	await db.insert(schema.playerStats).values({
 		playerId: player.playerId,
 		coins: 0,
 		experiencePoints: 0,
-		playerLevel: 1,
+		playerLevel: PLAYER_LEVEL,
 	});
+
+	const places = await db.select(
+		{ placeId: schema.place.placeId },
+	).from(schema.place).where(eq(schema.place.unlocksAt, PLAYER_LEVEL));
+
+	if (places.length > 0) {
+		await db.insert(schema.unlockedPlace)
+			.values(
+				places.map((place) => ({
+					placeId: place.placeId,
+					playerId: player.playerId,
+				})),
+			);
+	}
 
 	const sessionToken = generateSessionToken();
 	await createPlayerSession(sessionToken, player.playerId);
@@ -171,8 +187,9 @@ router.get("/", async (ctx) => {
 	const player = await db.query.player.findFirst({
 		where: eq(schema.player.playerId, ctx.state.playerId),
 		columns: {
-			username: true,
 			playerId: true,
+			username: true,
+			email: true,
 		},
 		with: {
 			stats: {
@@ -183,20 +200,30 @@ router.get("/", async (ctx) => {
 				},
 			},
 			unlockedPlaces: {
-				columns: {
-					placeId: true,
-				},
-			},
-			itemUpgrades: {
-				columns: {
-					itemId: true,
-					level: true,
-				},
-			},
-			levelGoalProgresses: {
-				columns: {
-					goalId: true,
-					obtainedValue: true,
+				columns: {},
+				with: {
+					place: {
+						columns: { placeId: true },
+						with: {
+							levels: {
+								columns: { levelId: true },
+								with: {
+									goals: {
+										columns: { goalId: true },
+										with: {
+											progresses: { columns: { obtainedValue: true } },
+										},
+									},
+								},
+							},
+							items: {
+								columns: { itemId: true },
+								with: {
+									upgrades: { columns: { level: true } },
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -208,8 +235,48 @@ router.get("/", async (ctx) => {
 		return;
 	}
 
+	const data = {
+		...player,
+		unlockedPlaces: player.unlockedPlaces.map((unlockedPlace) => {
+			const completedLevels = unlockedPlace.place.levels.map((level) => {
+				const goalProgresses = level.goals.map((goal) => {
+					if (goal.progresses.length == 0) {
+						return null;
+					}
+					return {
+						goalId: goal.goalId,
+						obtainedValue: goal.progresses[0].obtainedValue,
+					};
+				}).filter((goal) => goal != null);
+				if (goalProgresses.length == 0) {
+					return null;
+				}
+				return {
+					levelId: level.levelId,
+					goalProgresses: goalProgresses,
+				};
+			}).filter((level) => level != null);
+
+			const itemUpgrades = unlockedPlace.place.items.map((item) => {
+				if (item.upgrades.length == 0) {
+					return null;
+				}
+				return {
+					goalId: item.itemId,
+					upgrades: item.upgrades[0].level,
+				};
+			}).filter((upgrade) => upgrade != null);
+
+			return {
+				placeId: unlockedPlace.place.placeId,
+				completedLevels: completedLevels,
+				upgradedItems: itemUpgrades,
+			};
+		}),
+	};
+
 	ctx.response.status = 200;
-	ctx.response.body = { ok: true, data: player };
+	ctx.response.body = { ok: true, data };
 });
 
 export default router;

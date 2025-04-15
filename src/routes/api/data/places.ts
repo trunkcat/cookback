@@ -42,7 +42,7 @@ router.get("/", async (ctx) => {
 		},
 	});
 
-	ctx.response.body = places;
+	ctx.response.body = { ok: true, data: places };
 });
 
 router.get("/:placeId", async (ctx) => {
