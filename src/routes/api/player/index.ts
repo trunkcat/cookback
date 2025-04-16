@@ -63,7 +63,9 @@ router.post("/register", async (ctx) => {
 
 	const places = await db.select(
 		{ placeId: schema.place.placeId },
-	).from(schema.place).where(eq(schema.place.unlocksAt, PLAYER_LEVEL));
+	).from(schema.place).where(
+		and(eq(schema.place.unlocksAt, PLAYER_LEVEL), eq(schema.place.price, 0)),
+	);
 
 	if (places.length > 0) {
 		await db.insert(schema.unlockedPlace)
@@ -367,6 +369,32 @@ router.get("/leaderboard", async (ctx) => {
 
 	ctx.response.status = 200;
 	ctx.response.body = { ok: true, data: data };
+});
+
+const statsUpdateSchema = z.object({
+	coins: z.number(),
+	experiencePoints: z.number(),
+	playerLevel: z.number(),
+});
+
+router.put("/stats", async (ctx) => {
+	const parsed = await parseBody(ctx, statsUpdateSchema);
+	if (!parsed.ok) {
+		ctx.response.status = 400;
+		ctx.response.body = { ok: false, message: "Invalid details" };
+		return;
+	}
+
+	await db.update(schema.playerStats)
+		.set({
+			coins: parsed.data.coins,
+			experiencePoints: parsed.data.experiencePoints,
+			playerLevel: parsed.data.playerLevel,
+		})
+		.where(eq(schema.playerStats.playerId, ctx.state.playerId));
+
+	ctx.response.status = 200;
+	ctx.response.body = { ok: true, data: true };
 });
 
 export default router;
