@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { and, eq, not } from "drizzle-orm";
+import { and, eq, not, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { hashPassword, verifyPassword } from "../auth.js";
 import { env } from "../env.js";
@@ -7,10 +7,10 @@ import * as schema from "./schema.js";
 
 const connectionString = env.DATABASE_URL;
 
-const sql = neon(connectionString!);
+const neonClient = neon(connectionString!);
 
 export const db = drizzle({
-	client: sql,
+	client: neonClient,
 	schema: schema,
 	casing: "snake_case",
 });
@@ -75,4 +75,29 @@ export const SUPERMANAGER_PASSWORD = env.SUPERMANAGER_PASSWORD;
 	}
 
 	console.log("Setup supermanager account successfully.");
+
+	// TRIGGERS
+	console.log("Setting up triggers");
+
+	await db.execute(sql`
+		DROP TRIGGER IF EXISTS after_insert_player_trigger
+		ON players;`);
+
+	await db.execute(sql`
+		CREATE OR REPLACE FUNCTION create_player_stats_after_insert()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			INSERT INTO player_stats (player_id, player_level, coins, experience_points)
+			VALUES (NEW.player_id, 1, 0, 0);
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;`);
+
+	await db.execute(`
+		CREATE TRIGGER after_insert_player_trigger
+		AFTER INSERT ON players
+		FOR EACH ROW
+		EXECUTE FUNCTION create_player_stats_after_insert();`);
+
+	console.log("Setup triggers successfully!");
 })();

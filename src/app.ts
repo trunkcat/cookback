@@ -12,6 +12,7 @@ app.use(async (ctx, next) => {
 	try {
 		console.log("\n" + ctx.request.method, ctx.request.url.pathname);
 		await next();
+		console.log(ctx.response.status);
 	} catch (error) {
 		console.error(error);
 

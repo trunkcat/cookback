@@ -1,5 +1,5 @@
 import { Router } from "@oak/oak";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
 	calculateSessionIdFromToken,
@@ -60,13 +60,6 @@ router.post("/register", async (ctx) => {
 		.returning({ playerId: schema.player.playerId });
 
 	const PLAYER_LEVEL = 1;
-
-	await db.insert(schema.playerStats).values({
-		playerId: player.playerId,
-		coins: 0,
-		experiencePoints: 0,
-		playerLevel: PLAYER_LEVEL,
-	});
 
 	const places = await db.select(
 		{ placeId: schema.place.placeId },
@@ -277,6 +270,103 @@ router.get("/", async (ctx) => {
 
 	ctx.response.status = 200;
 	ctx.response.body = { ok: true, data };
+});
+
+const goalSchema = z.object({
+	placeId: z.number(),
+	levelId: z.number(),
+	goals: z.record(z.coerce.number(), z.number())
+		.refine((goals) => Object.keys(goals).length > 0),
+});
+
+router.put("/goal", async (ctx) => {
+	const parsed = await parseBody(ctx, goalSchema);
+	if (!parsed.ok) {
+		ctx.response.status = 400;
+		ctx.response.body = { ok: false, message: "Invalid details" };
+		return;
+	}
+
+	const excludedObtainedValue = sql.raw(`excluded.obtained_value`); // stupid drizzle
+
+	const updated = await db.insert(schema.placeLevelGoalProgress)
+		.values(
+			Object.keys(parsed.data.goals).map((key) => {
+				const goalId = Number(key);
+				return {
+					goalId: goalId,
+					obtainedValue: parsed.data.goals[goalId],
+					playerId: ctx.state.playerId,
+				};
+			}),
+		).onConflictDoUpdate({
+			target: [
+				schema.placeLevelGoalProgress.goalId,
+				schema.placeLevelGoalProgress.playerId,
+			],
+			set: { obtainedValue: excludedObtainedValue },
+			setWhere:
+				sql`${schema.placeLevelGoalProgress.obtainedValue} < ${excludedObtainedValue}`,
+		})
+		.returning({
+			goalId: schema.placeLevelGoalProgress.goalId,
+			obtainedValue: schema.placeLevelGoalProgress.obtainedValue,
+		});
+
+	ctx.response.status = 200;
+	ctx.response.body = { ok: true, data: updated };
+});
+
+const placePurchaseSchema = z.object({
+	placeId: z.number(),
+});
+
+router.post("/place", async (ctx) => {
+	const parsed = await parseBody(ctx, placePurchaseSchema);
+	if (!parsed.ok) {
+		ctx.response.status = 400;
+		ctx.response.body = { ok: false, message: "Invalid details" };
+		return;
+	}
+
+	await db.insert(schema.unlockedPlace)
+		.values({
+			placeId: parsed.data.placeId,
+			playerId: ctx.state.playerId,
+		});
+
+	ctx.response.status = 200;
+	ctx.response.body = { ok: true, data: true };
+});
+
+router.get("/leaderboard", async (ctx) => {
+	const MAX_LEADERBOARD_LIMIT = 50;
+
+	const baseQuery = db.select({
+		playerId: schema.player.playerId,
+		username: schema.player.username,
+		experiencePoints: schema.playerStats.experiencePoints,
+		coins: schema.playerStats.coins,
+		playerLevel: schema.playerStats.playerLevel,
+	})
+		.from(schema.playerStats)
+		.innerJoin(
+			schema.player,
+			eq(schema.playerStats.playerId, schema.player.playerId),
+		);
+
+	const data = await baseQuery
+		.orderBy(desc(schema.playerStats.experiencePoints))
+		.limit(MAX_LEADERBOARD_LIMIT);
+
+	if (!data.some((entry) => entry.playerId == ctx.state.playerId)) {
+		const [playerData] = await baseQuery
+			.where(eq(schema.playerStats.playerId, ctx.state.playerId));
+		data.push(playerData);
+	}
+
+	ctx.response.status = 200;
+	ctx.response.body = { ok: true, data: data };
 });
 
 export default router;

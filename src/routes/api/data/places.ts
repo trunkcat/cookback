@@ -18,12 +18,14 @@ router.get("/", async (ctx) => {
 		with: {
 			levels: {
 				columns: {
+					placeId: true,
 					levelId: true,
 					levelNo: true,
 				},
 				with: {
 					goals: {
 						columns: {
+							levelId: true,
 							goalId: true,
 							goalType: true,
 							goalValue: true,
@@ -33,6 +35,7 @@ router.get("/", async (ctx) => {
 			},
 			items: {
 				columns: {
+					placeId: true,
 					itemId: true,
 					gameItem: true,
 					maxLevel: true,
